@@ -49,6 +49,7 @@ API-ключ. Если `providers.<name>.api_key` не задан, OCR испо�
 |---|---|---|---|
 | `anthropic` | anthropic | `https://api.anthropic.com` | `ANTHROPIC_API_KEY` |
 | `bedrock` | anthropic-bedrock | определяется `aws_region` | — (цепочка учётных данных AWS) |
+| `claude-code` | claude-code | — (локальный CLI `claude`) | — (вход в Claude Code) |
 | `openai` | openai | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
 | `openai-responses` | openai-responses | `https://api.openai.com/v1` | `OPENAI_RESPONSES_API_KEY` |
 | `openrouter` | openai | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
@@ -139,12 +140,41 @@ Model:  claude-sonnet-5
 эти значения bedrock не использует, поэтому такая комбинация отклоняется, а не
 принимается и молча игнорируется.
 
+### Claude Code CLI
+
+`claude-code` отправляет все запросы к модели через локально установленный CLI
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) в headless-режиме, поэтому ревью
+может работать по входу в подписку Claude вместо API-ключа. Задавать `api_key` или URL не нужно:
+один раз войдите через `claude`, затем выберите провайдера:
+
+```bash
+ocr config set provider claude-code
+ocr config set model    sonnet
+```
+
+Основное ревью каждой группы файлов выполняется как одна сессия `claude -p`. OCR предоставляет
+этой сессии собственные инструменты (`file_read`, `code_search`, `code_comment` и другие) через
+локальный MCP-сервер, защищённый токеном, и отключает встроенные инструменты Claude Code,
+настройки, hooks, файлы `CLAUDE.md` и другие MCP-серверы, поэтому ревью остаётся только для чтения.
+Группировка, планирование и фильтр ревью отправляются одиночными вызовами `claude -p`.
+
+- Использование учитывается в лимитах вашего плана Claude, а условия Anthropic ограничивают
+  использование сторонних инструментов через вход в подписку claude.ai; прежде чем полагаться
+  на этого провайдера, убедитесь, что условия допускают ваш сценарий.
+- `claude` наследует окружение OCR: экспортированный `ANTHROPIC_API_KEY` заставит его
+  списывать оплату с этого API-ключа, а не с подписки.
+- `OCR_CLAUDE_CODE_BIN` указывает на бинарный файл `claude`, которого нет в `PATH`.
+- `ocr llm test` показывает бинарный файл CLI вместо URL и пропускает проверку вызова инструмента.
+- `ocr scan` пока не поддерживает этого провайдера.
+- Бюджет токенов проверяется между запусками `claude`, поэтому один запуск может превысить
+  `--max-tokens-budget`; число ходов ограничивает `MAX_TOOL_REQUEST_TIMES`.
+
 ### Пользовательские провайдеры
 
 Любое имя провайдера, которого нет в таблице выше, считается
 пользовательским. Для него необходимо задать как минимум `url` и `protocol`
 (`protocol` может принимать значения `anthropic`, `openai`,
-`openai-responses` или `anthropic-bedrock`):
+`openai-responses`, `anthropic-bedrock` или `claude-code`):
 
 ```bash
 ocr config set provider                             my-gateway

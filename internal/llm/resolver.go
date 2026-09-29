@@ -405,7 +405,7 @@ func tryProviderConfig(cfg configFile, modelOverride string) (ResolvedEndpoint, 
 	} else {
 		entry, ok = cfg.CustomProviders[cfg.Provider]
 	}
-	if !ok {
+	if !ok && !(isPreset && preset.Protocol == ProtocolClaudeCode) {
 		section := "providers"
 		if !isPreset {
 			section = "custom_providers"
@@ -485,7 +485,7 @@ func tryProviderConfig(cfg configFile, modelOverride string) (ResolvedEndpoint, 
 		if err := ValidateProtocol(normalized); err != nil {
 			return ResolvedEndpoint{}, false, fmt.Errorf("custom provider %q: %w", cfg.Provider, err)
 		}
-		if normalized != ProtocolAnthropicBedrock && entry.URL == "" {
+		if !protocolHasNoEndpoint(normalized) && entry.URL == "" {
 			return ResolvedEndpoint{}, false, fmt.Errorf("custom provider %q requires a url field for protocol %q", cfg.Provider, normalized)
 		}
 		url = entry.URL
@@ -499,7 +499,7 @@ func tryProviderConfig(cfg configFile, modelOverride string) (ResolvedEndpoint, 
 	// SigV4 signing and needs a token like anything else. Conversely an entry
 	// that selects the bedrock protocol explicitly signs its requests whatever
 	// the preset says.
-	ambientAuth := protocol == ProtocolAnthropicBedrock ||
+	ambientAuth := protocolHasNoEndpoint(protocol) ||
 		(isPreset && preset.AmbientAuth && entry.Protocol == "")
 
 	// No credential at all is an error, and it is reported before api_key_cmd

@@ -44,6 +44,7 @@ ocr config set providers.anthropic.api_key sk-ant-xxxxxxxxxx
 |---|---|---|---|
 | `anthropic` | anthropic | `https://api.anthropic.com` | `ANTHROPIC_API_KEY` |
 | `bedrock` | anthropic-bedrock | `aws_region` から決定 | —（AWS 認証情報チェーン） |
+| `claude-code` | claude-code | —（ローカルの `claude` CLI） | —（Claude Code のログイン） |
 | `openai` | openai | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
 | `openai-responses` | openai-responses | `https://api.openai.com/v1` | `OPENAI_RESPONSES_API_KEY` |
 | `openrouter` | openai | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
@@ -131,11 +132,40 @@ Model:  claude-sonnet-5
 置く場所がなく、bedrock はそこにある値をどちらも使いません。そのため黙って
 無視するのではなく、明示的に拒否されます。
 
+### Claude Code CLI
+
+`claude-code` は、ローカルにインストールされた [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+CLI をヘッドレスモードで使ってすべてのモデルリクエストを送信します。そのため、API key の代わりに
+Claude サブスクリプションのログインでレビューを実行できます。`api_key` や URL の設定は不要です。
+一度 `claude` でログインしてから provider を選択します：
+
+```bash
+ocr config set provider claude-code
+ocr config set model    sonnet
+```
+
+各ファイルグループのメインレビューは 1 つの `claude -p` セッションとして実行されます。OCR は
+トークンで保護されたローカルの MCP サーバー経由で自身のツール（`file_read`、`code_search`、
+`code_comment` など）をそのセッションに提供し、Claude Code の組み込みツール、設定、hooks、
+`CLAUDE.md` ファイル、他の MCP サーバーを無効にするため、レビューは読み取り専用のままです。
+グルーピング、計画、レビューフィルタは単発の `claude -p` 呼び出しとして送信されます。
+
+- 使用量は Claude プランの上限に計上されます。また Anthropic の規約は、サードパーティ製ツールを
+  claude.ai サブスクリプションのログイン経由で利用することを制限しています。この provider を使う前に、
+  規約があなたの用途を認めているか確認してください。
+- `claude` は OCR の環境変数を引き継ぎます。`ANTHROPIC_API_KEY` をエクスポートしていると、
+  サブスクリプションではなくその API key に課金されます。
+- `OCR_CLAUDE_CODE_BIN` で `PATH` 上にない `claude` バイナリを指定できます。
+- `ocr llm test` は URL の代わりに CLI バイナリを表示し、ツールの往復テストを省略します。
+- `ocr scan` はこの provider にまだ対応していません。
+- トークン予算は `claude` の実行と実行の間でチェックされるため、1 回の実行が
+  `--max-tokens-budget` を超えることがあります。ターン数は `MAX_TOOL_REQUEST_TIMES` で制限されます。
+
 ### カスタム provider
 
 上記の表にない provider 名はすべてカスタムとみなされ、少なくとも `url` と
 `protocol` を指定する必要があります（`protocol` は `anthropic`、`openai`、
-`openai-responses`、または `anthropic-bedrock`）。
+`openai-responses`、`anthropic-bedrock`、または `claude-code`）。
 
 ```bash
 ocr config set provider                             my-gateway

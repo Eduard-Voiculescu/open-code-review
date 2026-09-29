@@ -10,6 +10,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/alibaba/open-code-review/internal/claudecli"
 	"github.com/alibaba/open-code-review/internal/config/testconnection"
 	"github.com/alibaba/open-code-review/internal/llm"
 	"github.com/spf13/cobra"
@@ -95,6 +96,11 @@ func runLLMTestWithConfigPath(configPath string) error {
 		messages = append(messages, llm.Message{Role: m.Role, Content: m.Content})
 	}
 
+	// The claude CLI answers tools only as one forced structured-output call,
+	// so the tool round trip would prove nothing about it.
+	if ep.Protocol == llm.ProtocolClaudeCode {
+		task.Tool = nil
+	}
 	tools := testToolDefs(task.Tool)
 
 	// Each request gets the configured budget, as it did when this test made only
@@ -148,6 +154,8 @@ func runLLMTestWithConfigPath(configPath string) error {
 		} else {
 			fmt.Printf("Profile: (from the ambient AWS chain)\n")
 		}
+	} else if ep.Protocol == llm.ProtocolClaudeCode {
+		fmt.Printf("CLI:    %s\n", claudecli.Binary())
 	} else {
 		fmt.Printf("URL:    %s\n", ep.URL)
 	}

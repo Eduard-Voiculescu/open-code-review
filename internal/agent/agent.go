@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alibaba/open-code-review/internal/claudecode"
 	"github.com/alibaba/open-code-review/internal/config/rules"
 	"github.com/alibaba/open-code-review/internal/config/template"
 	"github.com/alibaba/open-code-review/internal/config/toolsconfig"
@@ -191,6 +192,7 @@ type Agent struct {
 	session         *session.SessionHistory
 	subtaskFailed   int64 // count of failed subtasks, accessed atomically
 	runner          *llmloop.Runner
+	mainTask        mainTasker
 	resumeInfo      *ResumeInfo
 	budgetExceeded  atomic.Bool // set when a token/tool-call budget gate stopped dispatch
 
@@ -255,7 +257,23 @@ func New(args Args) *Agent {
 		NewRequestMeta:  a.newRequestMeta,
 		MaxTokensBudget: args.MaxTokensBudget,
 	})
+	a.mainTask = a.runner
+	if args.RuntimeConfig.Protocol == llm.ProtocolClaudeCode {
+		a.mainTask = claudecode.NewMainTask(claudecode.MainTaskDeps{
+			Runner:          a.runner,
+			Session:         args.Session,
+			ToolDefs:        args.MainToolDefs,
+			Model:           args.Model,
+			MaxTurns:        args.Template.MaxToolRequestTimes,
+			MaxTokensBudget: args.MaxTokensBudget,
+		})
+	}
 	return a
+}
+
+// mainTasker runs one main-task conversation for a file group.
+type mainTasker interface {
+	RunMainTask(ctx context.Context, messages []llm.Message, taskKey string) (bool, llmloop.MainLoopStop, error)
 }
 
 // newRequestMeta builds the retry-report identity for one logical LLM request.
@@ -1485,7 +1503,7 @@ func (a *Agent) executeGroupSubtask(ctx context.Context, g FileGroup) (bool, *su
 			defer mainSpan.End()
 			telemetry.SetAttr(mainSpan, "group.label", groupKey)
 			telemetry.SetAttr(mainSpan, "round", round)
-			completed, stop, err := a.runner.RunMainTask(ctx, messages, groupKey)
+			completed, stop, err := a.mainTask.RunMainTask(ctx, messages, groupKey)
 			if err != nil {
 				mainSpan.SetStatus(codes.Error, err.Error())
 				mainSpan.RecordError(err)

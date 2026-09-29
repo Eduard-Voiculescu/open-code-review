@@ -35,6 +35,9 @@ const (
 	// official SDK's bedrock middleware performs that rewriting, so this
 	// shares the Anthropic client rather than reimplementing the protocol.
 	ProtocolAnthropicBedrock = "anthropic-bedrock"
+	// ProtocolClaudeCode runs every request through the locally installed,
+	// logged-in claude CLI in headless mode, so it has no endpoint and no key.
+	ProtocolClaudeCode = "claude-code"
 )
 
 // NormalizeProtocol canonicalizes protocol names. It is case-insensitive and
@@ -55,18 +58,26 @@ func NormalizeProtocol(raw string) string {
 		return ProtocolOpenAIResponses
 	case ProtocolAnthropicBedrock:
 		return ProtocolAnthropicBedrock
+	case ProtocolClaudeCode:
+		return ProtocolClaudeCode
 	default:
 		return normalized
 	}
 }
 
-// ValidateProtocol accepts the four canonical protocol names and rejects
+// ValidateProtocol accepts the canonical protocol names and rejects
 // everything else.
 func ValidateProtocol(p string) error {
 	switch p {
-	case ProtocolAnthropic, ProtocolOpenAIChatCompletions, ProtocolOpenAIResponses, ProtocolAnthropicBedrock:
+	case ProtocolAnthropic, ProtocolOpenAIChatCompletions, ProtocolOpenAIResponses, ProtocolAnthropicBedrock, ProtocolClaudeCode:
 		return nil
 	default:
-		return fmt.Errorf("unsupported protocol %q; supported protocols are %q, %q, %q, %q", p, ProtocolAnthropic, ProtocolOpenAIChatCompletions, ProtocolOpenAIResponses, ProtocolAnthropicBedrock)
+		return fmt.Errorf("unsupported protocol %q; supported protocols are %q, %q, %q, %q, %q", p, ProtocolAnthropic, ProtocolOpenAIChatCompletions, ProtocolOpenAIResponses, ProtocolAnthropicBedrock, ProtocolClaudeCode)
 	}
+}
+
+// protocolHasNoEndpoint reports whether a protocol's transport supplies its own
+// host and credentials, so neither a url nor an api_key is configured for it.
+func protocolHasNoEndpoint(p string) bool {
+	return p == ProtocolAnthropicBedrock || p == ProtocolClaudeCode
 }

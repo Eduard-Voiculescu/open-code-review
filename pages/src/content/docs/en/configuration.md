@@ -46,6 +46,7 @@ environment variable.
 |---|---|---|---|
 | `anthropic` | anthropic | `https://api.anthropic.com` | `ANTHROPIC_API_KEY` |
 | `bedrock` | anthropic-bedrock | derived from `aws_region` | — (AWS credential chain) |
+| `claude-code` | claude-code | — (local `claude` CLI) | — (Claude Code login) |
 | `openai` | openai | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
 | `openai-responses` | openai-responses | `https://api.openai.com/v1` | `OPENAI_RESPONSES_API_KEY` |
 | `openrouter` | openai | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
@@ -134,11 +135,42 @@ block describes one URL and one token, has nowhere to put a region or a profile,
 and bedrock uses neither value it does carry, so the combination is rejected
 rather than accepted and ignored.
 
+### Claude Code CLI
+
+`claude-code` sends every model request through your locally installed
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI in headless
+mode, so a review can run on a Claude subscription login instead of an API key.
+There is no `api_key` or URL to set: log in with `claude` once, then select the
+provider:
+
+```bash
+ocr config set provider claude-code
+ocr config set model    sonnet
+```
+
+Each file group's main review runs as one `claude -p` session. OCR serves its own
+tools (`file_read`, `code_search`, `code_comment`, …) to that session over a
+local, token-protected MCP server, and turns off Claude Code's built-in tools,
+settings, hooks, `CLAUDE.md` files and other MCP servers, so the review stays
+read-only. Grouping, planning and the review filter go out as single `claude -p`
+calls.
+
+- Usage counts against your Claude plan's limits, and Anthropic's terms restrict
+  routing third-party tools through a claude.ai subscription login; check they
+  allow your use before relying on this provider.
+- `claude` inherits OCR's environment: an exported `ANTHROPIC_API_KEY` makes it
+  bill that API key instead of your subscription.
+- `OCR_CLAUDE_CODE_BIN` points OCR at a `claude` binary that is not on `PATH`.
+- `ocr llm test` reports the CLI binary instead of a URL and skips the tool round trip.
+- `ocr scan` does not support this provider yet.
+- The token budget is checked between `claude` runs, so a single run can overshoot
+  `--max-tokens-budget`; `MAX_TOOL_REQUEST_TIMES` caps its turns.
+
 ### Custom providers
 
 Any provider name not in the table above is treated as custom and must
 supply at least `url` and `protocol` (`protocol` is `anthropic`,
-`openai`, `openai-responses`, or `anthropic-bedrock`):
+`openai`, `openai-responses`, `anthropic-bedrock`, or `claude-code`):
 
 ```bash
 ocr config set provider                             my-gateway

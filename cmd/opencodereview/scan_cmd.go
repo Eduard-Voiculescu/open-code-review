@@ -173,6 +173,9 @@ func executeScan(opts scanOptions) (retErr error) {
 	if err != nil {
 		return err
 	}
+	if rt.RuntimeConfig.Protocol == llm.ProtocolClaudeCode {
+		return fmt.Errorf("ocr scan does not support the %s protocol yet; use ocr review, or pick another provider with --provider", llm.ProtocolClaudeCode)
+	}
 	maxTokens, err := resolveMaxTokens(scanTpl.MaxTokens, rt.AppCfg, opts.maxTokens)
 	if err != nil {
 		return err

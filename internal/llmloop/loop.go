@@ -618,6 +618,12 @@ func graceRoundToolDefs(defs []llm.ToolDef) []llm.ToolDef {
 	return out
 }
 
+// ExecuteTool runs one tool call for a main task driven outside RunMainTask,
+// with the same argument repair, comment dispatch and failure accounting.
+func (r *Runner) ExecuteTool(ctx context.Context, taskKey string, call llm.ToolCall, rec *session.TaskRecord) tool.TaskCheckpoint {
+	return r.executeToolCall(ctx, taskKey, call, rec, "")
+}
+
 // executeToolCall dispatches a single tool call from the LLM response and
 // records the result in session history. code_comment handling includes
 // optional async dispatch through CommentWorkerPool plus line-number

@@ -42,6 +42,7 @@ ocr config set providers.anthropic.api_key sk-ant-xxxxxxxxxx
 |---|---|---|---|
 | `anthropic` | anthropic | `https://api.anthropic.com` | `ANTHROPIC_API_KEY` |
 | `bedrock` | anthropic-bedrock | `aws_region`에서 결정 | — (AWS 자격 증명 체인) |
+| `claude-code` | claude-code | — (로컬 `claude` CLI) | — (Claude Code 로그인) |
 | `openai` | openai | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
 | `openai-responses` | openai-responses | `https://api.openai.com/v1` | `OPENAI_RESPONSES_API_KEY` |
 | `openrouter` | openai | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
@@ -110,9 +111,36 @@ Model:  claude-sonnet-5
 
 Bedrock은 `llm.protocol`이나 `OCR_LLM_PROTOCOL`로는 사용할 수 **없습니다**. 이 블록은 URL 하나와 토큰 하나를 기술하는 구조라 리전이나 프로필을 담을 자리가 없고, bedrock은 이 블록이 담는 두 값 중 어느 것도 쓰지 않습니다. 그래서 이 조합은 받아들인 뒤 무시하는 대신 거부합니다.
 
+### Claude Code CLI {#claude-code-cli}
+
+`claude-code`는 로컬에 설치된 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI를
+헤드리스 모드로 사용해 모든 모델 요청을 보냅니다. 따라서 API 키 대신 Claude 구독 로그인으로 리뷰를
+실행할 수 있습니다. `api_key`나 URL은 설정할 필요가 없습니다. `claude`로 한 번 로그인한 뒤
+프로바이더를 선택하세요:
+
+```bash
+ocr config set provider claude-code
+ocr config set model    sonnet
+```
+
+각 파일 그룹의 메인 리뷰는 하나의 `claude -p` 세션으로 실행됩니다. OCR은 토큰으로 보호되는 로컬
+MCP 서버를 통해 자체 도구(`file_read`, `code_search`, `code_comment` 등)를 그 세션에 제공하고,
+Claude Code의 내장 도구, 설정, hooks, `CLAUDE.md` 파일, 다른 MCP 서버를 끄므로 리뷰는 읽기
+전용으로 유지됩니다. 그룹화, 계획, 리뷰 필터는 단일 `claude -p` 호출로 전송됩니다.
+
+- 사용량은 Claude 요금제 한도에 포함되며, Anthropic 약관은 서드파티 도구가 claude.ai 구독 로그인을
+  거쳐 사용되는 것을 제한합니다. 이 프로바이더를 쓰기 전에 약관이 해당 용도를 허용하는지 확인하세요.
+- `claude`는 OCR의 환경 변수를 물려받습니다. `ANTHROPIC_API_KEY`를 export해 두면 구독 대신 그 API
+  키로 과금됩니다.
+- `OCR_CLAUDE_CODE_BIN`으로 `PATH`에 없는 `claude` 바이너리를 지정할 수 있습니다.
+- `ocr llm test`는 URL 대신 CLI 바이너리를 표시하고 도구 왕복 테스트를 건너뜁니다.
+- `ocr scan`은 아직 이 프로바이더를 지원하지 않습니다.
+- 토큰 예산은 `claude` 실행 사이에 확인되므로 한 번의 실행이 `--max-tokens-budget`을 넘을 수
+  있습니다. 턴 수는 `MAX_TOOL_REQUEST_TIMES`로 제한됩니다.
+
 ### 커스텀 프로바이더 {#custom-providers}
 
-위 표에 없는 프로바이더 이름은 커스텀으로 취급하며 최소한 `url`과 `protocol`을 지정해야 합니다(`protocol`은 `anthropic`, `openai`, `openai-responses`, `anthropic-bedrock` 중 하나):
+위 표에 없는 프로바이더 이름은 커스텀으로 취급하며 최소한 `url`과 `protocol`을 지정해야 합니다(`protocol`은 `anthropic`, `openai`, `openai-responses`, `anthropic-bedrock`, `claude-code` 중 하나):
 
 ```bash
 ocr config set provider                             my-gateway

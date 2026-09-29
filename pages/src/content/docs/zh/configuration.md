@@ -43,6 +43,7 @@ ocr config set providers.anthropic.api_key sk-ant-xxxxxxxxxx
 |---|---|---|---|
 | `anthropic` | anthropic | `https://api.anthropic.com` | `ANTHROPIC_API_KEY` |
 | `bedrock` | anthropic-bedrock | 由 `aws_region` 决定 | —（AWS 凭证链） |
+| `claude-code` | claude-code | —（本地 `claude` CLI） | —（Claude Code 登录） |
 | `openai` | openai | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
 | `openai-responses` | openai-responses | `https://api.openai.com/v1` | `OPENAI_RESPONSES_API_KEY` |
 | `openrouter` | openai | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
@@ -124,11 +125,36 @@ Model:  claude-sonnet-5
 URL 加一个 token，没有地方放区域或 profile，而 bedrock 这两个值都不使用，因此
 会被明确拒绝，而不是接受后悄悄忽略。
 
+### Claude Code CLI
+
+`claude-code` 通过本地安装的 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+CLI 以无头模式发送所有模型请求，因此评审可以使用 Claude 订阅登录，而不需要 API key。
+无需设置 `api_key` 或 URL：先用 `claude` 登录一次，然后选择该 provider：
+
+```bash
+ocr config set provider claude-code
+ocr config set model    sonnet
+```
+
+每个文件分组的主评审作为一个 `claude -p` 会话运行。OCR 通过本地、带 token 保护的
+MCP 服务器把自己的工具（`file_read`、`code_search`、`code_comment` 等）提供给该会话，
+并关闭 Claude Code 的内置工具、设置、hooks、`CLAUDE.md` 文件和其他 MCP 服务器，
+使评审保持只读。分组、计划和评审过滤以单次 `claude -p` 调用发送。
+
+- 用量计入你的 Claude 套餐额度；Anthropic 的条款限制第三方工具通过 claude.ai 订阅登录调用，
+  使用该 provider 前请确认条款允许你的用法。
+- `claude` 继承 OCR 的环境变量：若导出了 `ANTHROPIC_API_KEY`，将按该 API key 计费而不是使用订阅。
+- `OCR_CLAUDE_CODE_BIN` 可指定不在 `PATH` 上的 `claude` 可执行文件。
+- `ocr llm test` 显示 CLI 可执行文件而不是 URL，并跳过工具往返测试。
+- `ocr scan` 暂不支持该 provider。
+- token 预算在两次 `claude` 运行之间检查，单次运行可能超出 `--max-tokens-budget`；
+  `MAX_TOOL_REQUEST_TIMES` 限制其轮数。
+
 ### 自定义 provider
 
 任何不在上表中的 provider 名都视为自定义，至少要提供 `url` 和 `protocol`
-（`protocol` 取 `anthropic`、`openai`、`openai-responses` 或
-`anthropic-bedrock`）：
+（`protocol` 取 `anthropic`、`openai`、`openai-responses`、
+`anthropic-bedrock` 或 `claude-code`）：
 
 ```bash
 ocr config set provider                             my-gateway
